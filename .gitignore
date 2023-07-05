@@ -1,0 +1,10 @@
+MANIFEST
+dist
+gifs
+.DS_Store
+*.egg-info
+__pycache__
+*.pyc
+.idea
+venv
+.venv
