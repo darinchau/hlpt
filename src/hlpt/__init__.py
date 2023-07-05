@@ -29,4 +29,4 @@
 
 from hlpt.base import Model
 from hlpt.models import StochasticNode, Sequential, LSTMSequenceModel, PositionalEncoding
-from hlpt.util import History
+from hlpt.util import History, CudaMonitor
