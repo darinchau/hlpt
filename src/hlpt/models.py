@@ -125,5 +125,5 @@ class Ligma(Model):
     
     Ligma(x) = 0 if x < -1, (x+1)/2 if -1 < x < 1, 1 if x > 1"""
     def forward(self, x: Tensor):
-        x = (torch.abs(x + 1) + torch.abs(x - 1) - 2) / 4
+        x = (torch.abs(x + 1) - torch.abs(x - 1) + 2) / 4
         return x
