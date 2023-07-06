@@ -127,24 +127,3 @@ class Ligma(Model):
     def forward(self, x: Tensor):
         x = (torch.abs(x + 1) + torch.abs(x - 1) - 2) / 4
         return x
-    
-    def benchmark(self):
-        import time
-        from tqdm import trange
-        times = []
-        for n in trange(1000):
-            x = torch.randn((200, 200, 200)).to('cuda')
-            y = x.clone()
-            t1 = time.perf_counter()
-            self(x)
-            t2 = time.perf_counter()
-            (torch.abs(y + 1) + torch.abs(y - 1) - 2) / 4
-            t3 = time.perf_counter()
-            times.append((t2-t1, t3-t2))
-        return times
-
-if __name__ == "__main__":
-    import numpy as np
-    a = np.array(Ligma().benchmark())
-    a = np.average(a, axis = 0)
-    print(a)
