@@ -33,6 +33,8 @@ class DataIterator:
             train, test = train_test_split(tensor.detach().cpu().numpy(), test_size = 1 - train_size, random_state=seed, shuffle = False, stratify=self.label)
             train = torch.as_tensor(train, dtype = tensor.dtype, device = tensor.device)
             test = torch.as_tensor(test, dtype = tensor.dtype, device = tensor.device)
+            trains.append(train)
+            tests.append(test)
         
         # Create new TensorDatasets and DataLoaders for train and test sets
         train_loader = DataIterator(*trains, batch_size=self.bs, label=self.label)
@@ -50,3 +52,33 @@ class DataIterator:
 
     def __len__(self):
         return self.len_t
+    
+    def _tensor_children(self):
+        for k, t in self.__dict__.items():
+            if isinstance(t, Tensor):
+                yield k, t
+    
+    def to(self, x):
+        for k, t in self._tensor_children():
+            self.__setattr__(k, t.to(x))
+        return self
+    
+    def double(self):
+        for k, t in self._tensor_children():
+            self.__setattr__(k, t.double())
+        return self
+    
+    def float(self):
+        for k, t in self._tensor_children():
+            self.__setattr__(k, t.float())
+        return self
+    
+    def cpu(self):
+        for k, t in self._tensor_children():
+            self.__setattr__(k, t.cpu())
+        return self
+    
+    def cuda(self):
+        for k, t in self._tensor_children():
+            self.__setattr__(k, t.cuda())
+        return self

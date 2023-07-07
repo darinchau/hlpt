@@ -123,7 +123,12 @@ class LSTMSequenceModel(Model):
 class Ligma(Model):
     """This stands for Linear sigmoid activation, which is defined as:
     
-    Ligma(x) = 0 if x < -1, (x+1)/2 if -1 < x < 1, 1 if x > 1"""
+    Ligma(x) = 0 if x < -1, (x+1)/2 if -1 < x < 1, 1 if x > 1
+    
+    Advantages: Both outputs and gradients are bounded to prevent vanishing gradient
+    when x < -1, l(x) = 0 so for sparse entry
+    
+    Disadvantages: input signal might easily get lost since everything is clamped"""
     def forward(self, x: Tensor):
         x = (torch.abs(x + 1) - torch.abs(x - 1) + 2) / 4
         return x
