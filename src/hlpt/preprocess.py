@@ -30,6 +30,9 @@ class Preprocessor(Model):
         self.at_most_apply = at_most_apply
     
     def forward(self, x: Tensor) -> Tensor:
+        if not self.training:
+            return x
+        
         applied = set()
         considered = set()
         while len(considered) < len(self.models) and len(applied) < self.at_most_apply:

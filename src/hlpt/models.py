@@ -90,7 +90,7 @@ class PositionalEncoding(Model):
         pos_encoding = pos_encoding.unsqueeze(0).transpose(0, 1)
         self.register_buffer("pos_encoding", pos_encoding)
         
-    def forward(self, token_embedding: torch.tensor) -> torch.tensor:
+    def forward(self, token_embedding: Tensor) -> Tensor:
         return self.dropout(token_embedding + self.pos_encoding[:token_embedding.size(0), :])
 
 class LSTMSequenceModel(Model):

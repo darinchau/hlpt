@@ -53,32 +53,22 @@ class DataIterator:
     def __len__(self):
         return self.len_t
     
-    def _tensor_children(self):
-        for k, t in self.__dict__.items():
-            if isinstance(t, Tensor):
-                yield k, t
-    
     def to(self, x):
-        for k, t in self._tensor_children():
-            self.__setattr__(k, t.to(x))
+        self.tensors = [t.to(x) for t in self.tensors]
         return self
     
     def double(self):
-        for k, t in self._tensor_children():
-            self.__setattr__(k, t.double())
+        self.tensors = [t.double() for t in self.tensors]
         return self
     
     def float(self):
-        for k, t in self._tensor_children():
-            self.__setattr__(k, t.float())
+        self.tensors = [t.float() for t in self.tensors]
         return self
     
     def cpu(self):
-        for k, t in self._tensor_children():
-            self.__setattr__(k, t.cpu())
+        self.tensors = [t.cpu() for t in self.tensors]
         return self
     
     def cuda(self):
-        for k, t in self._tensor_children():
-            self.__setattr__(k, t.cuda())
+        self.tensors = [t.cuda() for t in self.tensors]
         return self
