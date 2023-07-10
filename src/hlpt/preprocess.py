@@ -3,13 +3,14 @@ from torch import nn, Tensor
 import torch
 import traceback
 
-def random_(min_ = 0, max_ = 1):
+def random_(min_ = 0, max_ = 1) -> float:
     assert min_ < max_
     return torch.rand(1).item() * (max_ - min_) + min_
 
 class AugmentationLayer(Model):
     """Represents an Augmentation layer which randomly applys stuff"""
-    def __init__(self, p):
+    def __init__(self, p: float):
+        """Initialize the augmentation layer with a 0 <= p < 1 indicating how likely is it we apply this augmentation"""
         assert 0 <= p <= 1
         self.p = p
 
@@ -17,7 +18,7 @@ class AugmentationLayer(Model):
     def __call__(self, x: Tensor) -> Tensor:
         return super().__call__(x)
         
-    def rand(self, min_ = 0, max_ = 1):
+    def rand(self, min_ = 0, max_ = 1) -> float:
         """Get a random number from torch. This exists so that we always get the same random number from the same rng"""
         return random_(min_ = min_, max_ = max_)
     

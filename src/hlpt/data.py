@@ -11,7 +11,7 @@ class DataIterator(DataLoader):
     """A wrapper for datasets and dataloaders that automatically perform train-test splits and stuff like a torch dataloader
     
     label: if not None, we will perform train-test split in a stratified manner"""
-    def __init__(self, *t : Tensor, batch_size: int = 1, label: list | None = None, shuffle = False, progress_bar = True, use_multiprocess = True):
+    def __init__(self, *t : Tensor, batch_size: int = 1, label: list | None = None, shuffle = True, progress_bar = True, use_multiprocess = True):
         assert len(t) > 0
         self.len_t = len(t[0])
         for tensor in t:
@@ -33,7 +33,7 @@ class DataIterator(DataLoader):
             seed = 42069
 
         for tensor in self.tensors:
-            train, test = train_test_split(tensor.detach().cpu().numpy(), test_size = 1 - train_size, random_state=seed, shuffle = False, stratify=self.label)
+            train, test = train_test_split(tensor.detach().cpu().numpy(), test_size = 1 - train_size, random_state=seed, shuffle = self.shuffle, stratify=self.label)
             train = torch.as_tensor(train, dtype = tensor.dtype, device = tensor.device)
             test = torch.as_tensor(test, dtype = tensor.dtype, device = tensor.device)
             trains.append(train)
@@ -52,7 +52,7 @@ class DataIterator(DataLoader):
         if not self.pbar:
             return super().__iter__()
         
-        p = ProgressBar(total = len(self))
+        p = ProgressBar(total = self.tensors[0].size(0))
         for x in super().__iter__():
             yield x
             if isinstance(x, list):
