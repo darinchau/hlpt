@@ -5,21 +5,24 @@ from torch.utils.data import Dataset, DataLoader, TensorDataset
 from torch import Tensor
 from sklearn.model_selection import train_test_split
 import numpy as np
+from tqdm import tqdm as ProgressBar
 
-class DataIterator:
+class DataIterator(DataLoader):
     """A wrapper for datasets and dataloaders that automatically perform train-test splits and stuff like a torch dataloader
     
     label: if not None, we will perform train-test split in a stratified manner"""
-    def __init__(self, *t : Tensor, batch_size: int = 1, label: list | None = None, shuffle = False):
+    def __init__(self, *t : Tensor, batch_size: int = 1, label: list | None = None, shuffle = False, progress_bar = True, use_multiprocess = True):
         assert len(t) > 0
         self.len_t = len(t[0])
         for tensor in t:
             assert len(tensor) == self.len_t
         
-        self.tensors = t
-        self.bs = batch_size
+        super().__init__(TensorDataset(*t), batch_size=batch_size, shuffle = shuffle, num_workers=1 if use_multiprocess else 0)
         self.label = label
-        self.should_shuffle = shuffle
+        self.pbar = progress_bar
+        self.shuffle = shuffle
+        self.use_multiprocess = use_multiprocess
+        self.bs = batch_size
 
     def split(self, train_size = 0.85, *, seed = None) -> tuple[DataIterator, DataIterator]:
         """Performs train-test split"""
@@ -37,38 +40,23 @@ class DataIterator:
             tests.append(test)
         
         # Create new TensorDatasets and DataLoaders for train and test sets
-        train_loader = DataIterator(*trains, batch_size=self.bs, label=self.label)
-        test_loader = DataIterator(*tests, batch_size=self.bs, label=self.label)
+        train_loader = DataIterator(*trains, batch_size=self.bs, label=self.label, shuffle=self.shuffle, progress_bar=self.pbar, use_multiprocess=self.use_multiprocess)
+        test_loader = DataIterator(*tests, batch_size=self.bs, label=self.label, shuffle=self.shuffle, progress_bar=self.pbar, use_multiprocess=self.use_multiprocess)
         return train_loader, test_loader
     
-    def shuffle(self):
-        """Shuffles the dataset lazily (on iteration)"""
-        self.should_shuffle = True
+    @property
+    def tensors(self):
+        return self.dataset[:]
     
     def __iter__(self):
-        loader = DataLoader(TensorDataset(*self.tensors), batch_size = self.bs, num_workers = 1, shuffle = self.should_shuffle)
-        for l in loader:
-            yield l
-
-    def __len__(self):
-        return self.len_t
-    
-    def to(self, x):
-        self.tensors = [t.to(x) for t in self.tensors]
-        return self
-    
-    def double(self):
-        self.tensors = [t.double() for t in self.tensors]
-        return self
-    
-    def float(self):
-        self.tensors = [t.float() for t in self.tensors]
-        return self
-    
-    def cpu(self):
-        self.tensors = [t.cpu() for t in self.tensors]
-        return self
-    
-    def cuda(self):
-        self.tensors = [t.cuda() for t in self.tensors]
-        return self
+        if not self.pbar:
+            return super().__iter__()
+        
+        p = ProgressBar(total = len(self))
+        for x in super().__iter__():
+            yield x
+            if isinstance(x, list):
+                p.update(x[0].size(0))
+            elif isinstance(x, Tensor):
+                p.update(x.size(0))
+        p.close()
