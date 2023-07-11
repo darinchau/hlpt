@@ -4,9 +4,18 @@
 import torch
 from torch import nn, Tensor
 import torchvision.transforms as vision
-from hlpt import AugmentationLayer
+from hlpt.augments.base import AugmentationLayer
 import warnings
 from torchvision.transforms._functional_tensor import _get_gaussian_kernel2d
+
+__all__ = (
+    "AddCenterCrop", 
+    "AddGaussianBlur", 
+    "AddRandomChanneling", 
+    "AddRandomColoring", 
+    "AddRandomCrop", 
+    "AddSaltAndPepper",
+)
 
 class AddSaltAndPepper(AugmentationLayer):
     """Adds salt and pepper to image/video with some percentage"""

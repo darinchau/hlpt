@@ -5,9 +5,22 @@ import torch
 from torch import nn, Tensor
 import torchaudio
 from torchaudio.transforms import *
-from hlpt import Model
+from hlpt.base import Model
 import warnings
-from hlpt import AugmentationLayer
+from hlpt.augments.base import AugmentationLayer
+
+__all__ = (
+    "ExtractFFT", 
+    "AddNoise", 
+    "AddPitchScaling", 
+    "AddRandomGain", 
+    "AddTimeStretch", 
+    "AddWhiteNoise",
+    "AddReverb",
+    "AddLowPassFilter",
+    "AddTimeMasking",
+    "AddFrequencyMasking"
+)
 
 class ExtractFFT(Model):
     """Performs FFT to extract features in mel scale on the provided audio"""
@@ -25,15 +38,20 @@ class ExtractFFT(Model):
 
 class AddTimeStretch(AugmentationLayer):
     def __init__(self, min_ = 0.8, max_ = 1.2, p = 0.5, nbins = 128):
-        """PyTorch augmentation layer that applies time stretching. Note this"""
+        """PyTorch augmentation layer that applies time stretching on mel spectrogram. Accepts audio of shape (N, nfrequency, nbins)"""
         super().__init__(p)
         self.t = TimeStretch(hop_length = 256, n_freq = nbins)
         self.min_ = min_
         self.max_ = max_
+        self.nbins = nbins
 
     def forward(self, x: Tensor):
-        if len(x.shape) != 3:
-            raise RuntimeError("Number of dimensions of x must be 3 (N, n_audioframes, n_melfilterbanks)")
+        if len(x.shape) < 3:
+            raise RuntimeError(f"x must have at least 3 dimensions, but found x with shape {x.shape}")
+        nbins = x.shape[-1]
+        if self.nbins != nbins:
+            warnings.warn(f"The declared number of bins {self.nbins} does not match x {x.shape[-1]} in AddFrequencyName.")
+
 
         rate = self.rand(self.min_, self.max_)
         with warnings.catch_warnings():
@@ -41,30 +59,63 @@ class AddTimeStretch(AugmentationLayer):
             x = self.t(x, rate).to(dtype = x.dtype)
         return x
 
-class AddPitchScaling(AugmentationLayer):
-    def __init__(self, sample_rate: int = 22050, p = 0.1):
-        """Pytorch augmentation layer that applies pitch shifting. This is hardcoded to be between -2 halfsteps and 2 halfsteps"""
+class AddFrequencyMasking(AugmentationLayer):
+    def __init__(self, p = 0.4, max_width_percentage = 0.08, nbins = 128):
+        """PyTorch augmentation layer that applies frequency masking on mel spectrogram. Accepts audio of shape (N, nfrequency, nbins)"""
         super().__init__(p)
-        # Temporarily shut up pls
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            self.shift_dflat = PitchShift(sample_rate=sample_rate, n_steps = -2)
-            self.shift_flat = PitchShift(sample_rate=sample_rate, n_steps = -1)
-            self.shift_sharp = PitchShift(sample_rate=sample_rate, n_steps = 1)
-            self.shift_dsharp = PitchShift(sample_rate=sample_rate, n_steps = 2)
+        assert 0 < max_width_percentage < 1
+        self.max_ = max_width_percentage
+        self.nbins = nbins
 
     def forward(self, x: Tensor):
-        if len(x.shape) != 2:
-            raise RuntimeError("Number of dimensions of x must be 2 (N, n_audioframes)")
-        rng = int(self.rand(0, 4))
-        if rng == 0:
-            x = self.shift_dflat(x)
-        elif rng == 1:
-            x = self.shift_flat(x)
-        elif rng == 2:
-            x = self.shift_sharp(x)
-        else:
-            x = self.shift_dsharp(x)
+        if len(x.shape) < 3:
+            raise RuntimeError(f"x must have at least 3 dimensions, but found x with shape {x.shape}")
+        nbins = x.shape[-1]
+        if self.nbins != nbins:
+            warnings.warn(f"The declared number of bins {self.nbins} does not match x {x.shape[-1]} in AddFrequencyName.")
+        
+        mask = int(nbins * self.max_ * self.rand())
+        bottom = int(self.rand() * (nbins - mask))
+        x[..., bottom:bottom+mask] = torch.min(x)
+        return x
+    
+class AddTimeMasking(AugmentationLayer):
+    def __init__(self, p = 0.4, max_width_percentage = 0.08, nbins = 128):
+        """PyTorch augmentation layer that applies time masking on mel spectrogram. Accepts audio of shape (N, nfrequency, nbins)"""
+        super().__init__(p)
+        assert 0 < max_width_percentage < 1
+        self.max_ = max_width_percentage
+        self.nbins = nbins
+
+    def forward(self, x: Tensor):
+        if len(x.shape) < 3:
+            raise RuntimeError(f"x must have at least 3 dimensions, but found x with shape {x.shape}")
+        nbins = x.shape[-1]
+        if self.nbins != nbins:
+            warnings.warn(f"The declared number of bins {self.nbins} does not match x {x.shape[-1]} in AddFrequencyName.")
+        
+        naudioframes = x.shape[-2]
+        mask = int(naudioframes * self.max_ * self.rand())
+        left = int(self.rand() * (naudioframes - mask))
+        x[..., left:left+mask, :] = torch.min(x)
+        return x
+
+# Add 1 and 2d support to pitch scaling stuff
+class AddPitchScaling(AugmentationLayer):
+    """PyTorch augmentation layer that applies random gain and adds Gaussian noise to an audio waveform.
+        Audio feature extraction. Accepts audio of shape (N, nchannels, nframes)"""
+    def __init__(self, sample_rate_hz: int, min_cent = -200, max_cent = 200, p = 0.4):
+        super().__init__(p)
+        self.sample_rate_hz = sample_rate_hz
+        self.min_x = min_cent
+        self.max_x = max_cent
+    
+    def forward(self, x: Tensor):
+        xs = x.shape[:-1]
+        x = x.flatten(end_dim=-2).detach().cpu()
+        cent = int(self.rand(self.min_x, self.max_x))
+        x, _ = torchaudio.sox_effects.apply_effects_tensor(x, self.sample_rate_hz, [["pitch", f"{cent}"]])
+        x = x.to(x.device, dtype = x.dtype).unflatten(dim = 0, sizes = xs)
         return x
 
 class AddWhiteNoise(AugmentationLayer):
@@ -74,10 +125,11 @@ class AddWhiteNoise(AugmentationLayer):
         intensity of the noise added to the audio file
         max_amplitude: The maximum amplitude of the added white noise. This parameter controls the
         strength of the noise added to the audio file
-        p_apply: the probability of applying this transform"""
-        super().__init__()
-        assert 0 <= p <= 1
-        self.p = p
+        p_apply: the probability of applying this transform
+        
+        PyTorch augmentation layer that applies random gain and adds Gaussian noise to an audio waveform.
+        Audio feature extraction. Accepts audio of shape (N, nchannels, nframes)"""
+        super().__init__(p)
         self.min_amplitude = min_amplitude
         self.max_amplitude = max_amplitude
 
@@ -88,14 +140,40 @@ class AddWhiteNoise(AugmentationLayer):
         return x
     
 class AddRandomGain(AugmentationLayer):
-    """PyTorch augmentation layer that applies random gain and adds Gaussian noise to an audio waveform."""
+    """PyTorch augmentation layer that applies random gain and adds Gaussian noise to an audio waveform.
+    Audio feature extraction. Accepts audio of shape (N, nchannels, nframes)"""
     def __init__(self, p = 0.6, min_ = 0.8, max_ = 1.2):
-        super().__init__()
-        assert 0 <= p <= 1
-        self.p = p
+        super().__init__(p)
         self.min_gain_factor = min_
         self.max_gain_factor = max_
     
     def forward(self, x: Tensor) -> Tensor:
         x = x * self.rand(self.min_gain_factor, self.max_gain_factor)
+        return x
+
+class AddReverb(AugmentationLayer):
+    """Audio feature extraction. Accepts audio of shape (N, nchannels, nframes)"""
+    def __init__(self, sample_rate_hz: int, p = 0.4):
+        super().__init__(p)
+        self.sample_rate_hz = sample_rate_hz
+    
+    def forward(self, x: Tensor):
+        xs = x.shape[:-1]
+        x = x.flatten(end_dim=-2).detach().cpu()
+        x, _ = torchaudio.sox_effects.apply_effects_tensor(x, self.sample_rate_hz, [["reverb", "-w"]])
+        x = x.to(x.device, dtype = x.dtype).unflatten(dim = 0, sizes = xs)
+        return x
+
+class AddLowPassFilter(AugmentationLayer):
+    """Audio feature extraction. Accepts audio of shape (N, nchannels, nframes)"""
+    def __init__(self, sample_rate_hz: int, p = 0.4):
+        super().__init__(p)
+        self.sample_rate_hz = sample_rate_hz
+    
+    def forward(self, x: Tensor):
+        filter = int(self.rand(30, 4000))
+        xs = x.shape[:-1]
+        x = x.flatten(end_dim=-2).detach().cpu()
+        x, _ = torchaudio.sox_effects.apply_effects_tensor(x, self.sample_rate_hz, [["lowpass", "-1", f"{filter}"]])
+        x = x.to(x.device, dtype = x.dtype).unflatten(dim = 0, sizes = xs)
         return x
