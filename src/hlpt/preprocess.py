@@ -23,7 +23,7 @@ class AugmentationLayer(Model):
         return random_(min_ = min_, max_ = max_)
     
 class Preprocessor(Model):
-    """At most apply n modelss"""
+    """At most apply a random subset of n models"""
     def __init__(self, *models: AugmentationLayer, at_most_apply: int = 3):
         for model in models:
             assert isinstance(model, AugmentationLayer)
@@ -34,6 +34,7 @@ class Preprocessor(Model):
         if not self.training:
             return x
         
+        # Applies a random subset of models to the input tensor during training.
         applied = set()
         considered = set()
         while len(considered) < len(self.models) and len(applied) < self.at_most_apply:
@@ -45,5 +46,6 @@ class Preprocessor(Model):
                 if hasattr(self, "debug") and self.debug:
                     print(f"Applying {self.models[index]}")
                 applied.add(index)
-                x = self.models[index](x)
+                with torch.no_grad():
+                    x = self.models[index](x)
         return x
