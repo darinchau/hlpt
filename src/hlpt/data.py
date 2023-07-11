@@ -1,7 +1,7 @@
 ### Provides a custom Dataset class for nice things to happen
 from __future__ import annotations
 import torch
-from torch.utils.data import Dataset, DataLoader, TensorDataset
+from torch.utils.data import Dataset, DataLoader, TensorDataset, ConcatDataset
 from torch import Tensor
 from sklearn.model_selection import train_test_split
 import numpy as np
@@ -23,25 +23,17 @@ class DataIterator(DataLoader):
         self.shuffle = shuffle
         self.use_multiprocess = use_multiprocess
         self.bs = batch_size
-
+    
     def split(self, train_size = 0.85, *, seed = None) -> tuple[DataIterator, DataIterator]:
         """Performs train-test split"""
-        trains = []
-        tests = []
-
         if seed is None:
             seed = 42069
 
-        for tensor in self.tensors:
-            train, test = train_test_split(tensor.detach().cpu().numpy(), test_size = 1 - train_size, random_state=seed, shuffle = self.shuffle, stratify=self.label)
-            train = torch.as_tensor(train, dtype = tensor.dtype, device = tensor.device)
-            test = torch.as_tensor(test, dtype = tensor.dtype, device = tensor.device)
-            trains.append(train)
-            tests.append(test)
-        
+        tensors = train_test_split(*[tensor.detach().cpu().numpy() for tensor in self.tensors], test_size = 1 - train_size, random_state=seed, shuffle = self.shuffle)
+
         # Create new TensorDatasets and DataLoaders for train and test sets
-        train_loader = DataIterator(*trains, batch_size=self.bs, label=self.label, shuffle=self.shuffle, progress_bar=self.pbar, use_multiprocess=self.use_multiprocess)
-        test_loader = DataIterator(*tests, batch_size=self.bs, label=self.label, shuffle=self.shuffle, progress_bar=self.pbar, use_multiprocess=self.use_multiprocess)
+        train_loader = DataIterator(*tensors[::2], batch_size=self.bs, label=self.label, shuffle=self.shuffle, progress_bar=self.pbar, use_multiprocess=self.use_multiprocess)
+        test_loader = DataIterator(*tensors[1::2], batch_size=self.bs, label=self.label, shuffle=self.shuffle, progress_bar=self.pbar, use_multiprocess=self.use_multiprocess)
         return train_loader, test_loader
     
     @property
@@ -52,7 +44,7 @@ class DataIterator(DataLoader):
         if not self.pbar:
             return super().__iter__()
         
-        p = ProgressBar(total = self.tensors[0].size(0))
+        p = ProgressBar(total = len(self))
         for x in super().__iter__():
             yield x
             if isinstance(x, list):

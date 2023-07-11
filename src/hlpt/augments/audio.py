@@ -8,6 +8,7 @@ from torchaudio.transforms import *
 from hlpt.base import Model
 import warnings
 from hlpt.augments.base import AugmentationLayer
+import torchaudio.functional as F
 
 __all__ = (
     "ExtractFFT", 
@@ -52,11 +53,11 @@ class AddTimeStretch(AugmentationLayer):
         if self.nbins != nbins:
             warnings.warn(f"The declared number of bins {self.nbins} does not match x {x.shape[-1]} in AddFrequencyName.")
 
-
+    
         rate = self.rand(self.min_, self.max_)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            x = self.t(x, rate).to(dtype = x.dtype)
+            x = self.t(x.transpose(-1, -2), rate).to(dtype = x.dtype).transpose(-1, -2)
         return x
 
 class AddFrequencyMasking(AugmentationLayer):
@@ -100,22 +101,31 @@ class AddTimeMasking(AugmentationLayer):
         x[..., left:left+mask, :] = torch.min(x)
         return x
 
-# Add 1 and 2d support to pitch scaling stuff
 class AddPitchScaling(AugmentationLayer):
-    """PyTorch augmentation layer that applies random gain and adds Gaussian noise to an audio waveform.
-        Audio feature extraction. Accepts audio of shape (N, nchannels, nframes)"""
-    def __init__(self, sample_rate_hz: int, min_cent = -200, max_cent = 200, p = 0.4):
+    def __init__(self, sample_rate_hz: int = 22050, p = 0.1):
+        """Pytorch augmentation layer that applies pitch shifting. This is hardcoded to be between -2 halfsteps and 2 halfsteps"""
         super().__init__(p)
-        self.sample_rate_hz = sample_rate_hz
-        self.min_x = min_cent
-        self.max_x = max_cent
-    
+        # Temporarily shut up pls
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            self.shift_dflat = PitchShift(sample_rate=sample_rate_hz, n_steps = -2)
+            self.shift_flat = PitchShift(sample_rate=sample_rate_hz, n_steps = -1)
+            self.shift_sharp = PitchShift(sample_rate=sample_rate_hz, n_steps = 1)
+            self.shift_dsharp = PitchShift(sample_rate=sample_rate_hz, n_steps = 2)
+
     def forward(self, x: Tensor):
         xs = x.shape[:-1]
-        x = x.flatten(end_dim=-2).detach().cpu()
-        cent = int(self.rand(self.min_x, self.max_x))
-        x, _ = torchaudio.sox_effects.apply_effects_tensor(x, self.sample_rate_hz, [["pitch", f"{cent}"]])
-        x = x.to(x.device, dtype = x.dtype).unflatten(dim = 0, sizes = xs)
+        x = x.flatten(end_dim=-2)
+        rng = int(self.rand(0, 4))
+        if rng == 0:
+            x = self.shift_dflat(x)
+        elif rng == 1:
+            x = self.shift_flat(x)
+        elif rng == 2:
+            x = self.shift_sharp(x)
+        else:
+            x = self.shift_dsharp(x)
+        x = x.unflatten(dim = 0, sizes = xs)
         return x
 
 class AddWhiteNoise(AugmentationLayer):
@@ -171,9 +181,41 @@ class AddLowPassFilter(AugmentationLayer):
         self.sample_rate_hz = sample_rate_hz
     
     def forward(self, x: Tensor):
-        filter = int(self.rand(30, 4000))
+        filter = self.rand(30, 4000)
         xs = x.shape[:-1]
-        x = x.flatten(end_dim=-2).detach().cpu()
-        x, _ = torchaudio.sox_effects.apply_effects_tensor(x, self.sample_rate_hz, [["lowpass", "-1", f"{filter}"]])
+        x = x.flatten(end_dim=-2)
+        x = F.lowpass_biquad(x, self.sample_rate_hz, filter)
+        x = x.to(x.device, dtype = x.dtype).unflatten(dim = 0, sizes = xs)
+        return x
+
+class AddHighPassFilter(AugmentationLayer):
+    """Audio feature extraction. Accepts audio of shape (N, nchannels, nframes)"""
+    def __init__(self, sample_rate_hz: int, p = 0.4):
+        super().__init__(p)
+        self.sample_rate_hz = sample_rate_hz
+    
+    def forward(self, x: Tensor):
+        filter = self.rand(4000, 20000)
+        xs = x.shape[:-1]
+        x = x.flatten(end_dim=-2)
+        x = F.highpass_biquad(x, self.sample_rate_hz, filter)
+        x = x.to(x.device, dtype = x.dtype).unflatten(dim = 0, sizes = xs)
+        return x
+
+class AddReverb(AugmentationLayer):
+    """Audio feature extraction. Accepts audio of shape (N, nchannels, nframes)"""
+    def __init__(self, sample_rate_hz: int, p = 0.4, max_delay_ms = 60, max_reverb = 0.1):
+        super().__init__(p)
+        self.sample_rate_hz = sample_rate_hz
+        assert max_delay_ms >= 0
+        self.max_delay_ms = max_delay_ms
+        self.max_reverb = max_reverb
+    
+    def forward(self, x: Tensor):
+        delay_frames = max(int(self.rand() * self.sample_rate_hz / 1000 * self.max_delay_ms), 1)
+        reverb_amount = self.rand(-self.max_reverb, self.max_reverb)
+        xs = x.shape[:-1]
+        x = x.flatten(end_dim=-2)
+        x[..., delay_frames:] += x[..., :-delay_frames] * reverb_amount
         x = x.to(x.device, dtype = x.dtype).unflatten(dim = 0, sizes = xs)
         return x

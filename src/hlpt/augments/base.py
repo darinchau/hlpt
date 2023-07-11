@@ -5,6 +5,8 @@ import traceback
 
 def random_(min_ = 0, max_ = 1) -> float:
     assert min_ < max_
+    if min_ == 0 and max_ == 1:
+        return torch.rand(1).item()
     return torch.rand(1).item() * (max_ - min_) + min_
 
 class AugmentationLayer(Model):
