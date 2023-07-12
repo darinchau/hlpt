@@ -52,7 +52,6 @@ class AddTimeStretch(AugmentationLayer):
         nbins = x.shape[-1]
         if self.nbins != nbins:
             warnings.warn(f"The declared number of bins {self.nbins} does not match x {x.shape[-1]} in AddFrequencyName.")
-
     
         rate = self.rand(self.min_, self.max_)
         with warnings.catch_warnings():

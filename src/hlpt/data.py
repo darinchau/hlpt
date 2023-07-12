@@ -75,6 +75,8 @@ class ConcatIterator(DataLoader):
         self.d2 = d2
         super().__init__(self.d1.dataset + self.d2.dataset, batch_size=batch_size, shuffle = shuffle, num_workers=1 if use_multiprocess else 0)
         self.pbar = progress_bar
+        self.shuffle = shuffle
+        self.use_multiprocess = use_multiprocess
     
     def __iter__(self):        
         p = ProgressBar(total = len(self), disable = not self.pbar)

@@ -12,12 +12,18 @@ class History:
         self.names: set[str] = set()
         self.logs: list[str] = []
         self.training = True
+        self._test_called = False
     
     def train(self):
         self.training = True
+        if self._test_called:
+            self._test_called = False
+            self.update()
+        
 
     def test(self):
         self.training = False
+        self._test_called = True
 
     def add_loss(self, name, loss, batch_size = 1):
         """Logs the loss to an internal buffer for plotting later"""

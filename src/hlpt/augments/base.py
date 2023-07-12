@@ -25,6 +25,7 @@ class AugmentationLayer(Model):
         return random_(min_ = min_, max_ = max_)
     
 class Preprocessor(Model):
+    _info_show_impl_details = False
     """At most apply a random subset of n models"""
     def __init__(self, *models: AugmentationLayer, at_most_apply: int = 3):
         for model in models:
@@ -51,3 +52,7 @@ class Preprocessor(Model):
                 with torch.no_grad():
                     x = self.models[index](x)
         return x
+
+    def children(self):
+        for i, model in enumerate(self.models):
+            yield model
