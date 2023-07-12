@@ -4,6 +4,7 @@ from hlpt.base import Model, _model_info
 from torch import nn, Tensor
 import torch
 import traceback
+import warnings
 
 class StochasticNode(Model):
     """Stochastic node for VAE. The output is inherently random. Specify the device if needed"""
@@ -132,3 +133,60 @@ class Ligma(Model):
     def forward(self, x: Tensor):
         x = (torch.abs(x + 1) - torch.abs(x - 1) + 2) / 4
         return x
+
+class ExtractPrincipalComponent(Model):
+    """Takes the tensor x, and returns the principal d dimensions by calculating its covariance matrix. d indicates the number of principal components to extract
+    Input shape should be (N, nfeatures)"""
+    def __init__(self, d: int, /, device = None):
+        self.d = d
+        self.eigenvectors = None
+
+    def fit(self, X: Tensor):
+        """X is a (N, n_features). This computes the projection data for PCA. Returns None. The sorted eigenvalues is at `model.eigenvalues` and the sorted eigenvectors are at `model.eigenvectors`"""
+        cov = torch.cov(X.T.float())
+        l, v = torch.linalg.eig(cov)
+
+        # Temporarily supress warnings. This normally screams at us for discarding the complex part. But covariance matric is always positive definite so real eigenvalues :)
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=UserWarning)
+            self.eigenvalues, sorted_eigenidx = torch.abs(l.double()).sort(descending=True)
+            self.eigenvectors = v[:, sorted_eigenidx].double()
+        
+    def project(self, X: Tensor) -> Tensor:
+        """X is a (N, n_features) tensor. This performs the projection for you and returns an (n_data, d) tensor. Raises a runtime error if n_features does not match that in training"""
+        if self.eigenvectors is None:
+            raise RuntimeError("Projection data has not been calculated yet. Please first call model.fit()")
+        
+        P = self.eigenvectors[:, :self.d]
+        
+        if X.shape[1] != P.shape[0]:
+            raise RuntimeError(f"Expects {P.shape[0]}-dimensional data due to training. Got {X.shape[1]}-d data instead.")
+        
+        # Welcome to transpose hell
+        X_ = X - torch.mean(X.float(), dim = 0)
+        components = X_.double() @ P
+        return components
+    
+    def unproject(self, X: Tensor):
+        """Try to compute the inverse of model.project(X). The input is a tensor of shape (n_data, d) and returns a tensor of (n_data, n_features)"""
+        # XP = X* so given X* we have X = X*P⁻¹
+        # Problem is P is a matrix of shape (n_features, d), so we need to make it square first to take inverse.
+        # However, P is originally (n_features, n_features) big which we can take inverses, the reason
+        # P has the shape (n, d) is because it is actually the combination of the real P matrix followed by extracting first N columns
+        # We use a workaround: append zeros on X until it has enough features, then use the full P inverse
+        if self.eigenvectors is None:
+            raise RuntimeError("Projection data has not been calculated yet. Please first call model.fit()")
+
+        X_ = torch.zeros(X.shape[0], self.eigenvalues.shape[0])
+        X_[:, :X.shape[1]] = X
+        P = self.eigenvectors
+        try:
+            result = X_ @ torch.linalg.inv(P)
+        except RuntimeError as e:
+            raise RuntimeError("PCA eigenvectors matrix is not invertible for some reason. This is probably due to that there are very very very small (coerced to 0) eigenvalues.")
+        return result
+        
+    def forward(self, X: Tensor) -> Tensor:
+        """fit followed by project. Takes input of shape (N, nfeatures)"""
+        self.fit(X)
+        return self.project(X)
