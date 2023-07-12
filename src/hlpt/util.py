@@ -40,7 +40,7 @@ class History:
         self.losses.append({})
         self.counts = {}
 
-    def plot(self, root: str, name: str):
+    def plot(self, root: str, n: str):
         """Plot the losses using matplotlib"""
         fig, ax = plt.subplots()
         for name in self.names:
@@ -54,7 +54,7 @@ class History:
         ax.set_yscale('log')
         ax.legend()
         ax.set_title(f"Train/Test Error plot")
-        fig.savefig(f"{root}/{name} training loss.jpg")
+        fig.savefig(f"{root}/{n} training loss.jpg")
 
     def __iter__(self):
         for i, losses in enumerate(self.losses):
