@@ -218,3 +218,14 @@ class AddReverb(AugmentationLayer):
         x[..., delay_frames:] += x[..., :-delay_frames] * reverb_amount
         x = x.to(x.device, dtype = x.dtype).unflatten(dim = 0, sizes = xs)
         return x
+    
+class AddWhiteNoisePadding(AugmentationLayer):
+    """Audio feature extraction. Accepts audio of shape (N, nchannels, nframes)"""
+    def __init__(self, sample_rate_hz: int, max_second: float = 0.1, p = 0.3):
+        super().__init__(p)
+        self.sample_rate_hz = sample_rate_hz
+        self.max_second = max_second
+
+    def forward(self, x: Tensor):
+        length = int(self.sample_rate_hz * self.max_second * self.rand())
+        return nn.functional.pad(x, (0, 0, length), value = 0)

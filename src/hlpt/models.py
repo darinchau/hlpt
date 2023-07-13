@@ -137,8 +137,7 @@ class Ligma(Model):
 class ExtractPrincipalComponent(Model):
     """Takes the tensor x, and returns the principal d dimensions by calculating its covariance matrix. d indicates the number of principal components to extract
     Input shape should be (N, nfeatures)"""
-    def __init__(self, d: int, /, device = None):
-        self.d = d
+    def __init__(self):
         self.eigenvectors = None
 
     def fit(self, X: Tensor):
@@ -152,12 +151,12 @@ class ExtractPrincipalComponent(Model):
             self.eigenvalues, sorted_eigenidx = torch.abs(l.double()).sort(descending=True)
             self.eigenvectors = v[:, sorted_eigenidx].double()
         
-    def project(self, X: Tensor) -> Tensor:
+    def project(self, X: Tensor, d: int) -> Tensor:
         """X is a (N, n_features) tensor. This performs the projection for you and returns an (n_data, d) tensor. Raises a runtime error if n_features does not match that in training"""
         if self.eigenvectors is None:
             raise RuntimeError("Projection data has not been calculated yet. Please first call model.fit()")
         
-        P = self.eigenvectors[:, :self.d]
+        P = self.eigenvectors[:, :d]
         
         if X.shape[1] != P.shape[0]:
             raise RuntimeError(f"Expects {P.shape[0]}-dimensional data due to training. Got {X.shape[1]}-d data instead.")
@@ -186,7 +185,7 @@ class ExtractPrincipalComponent(Model):
             raise RuntimeError("PCA eigenvectors matrix is not invertible for some reason. This is probably due to that there are very very very small (coerced to 0) eigenvalues.")
         return result
         
-    def forward(self, X: Tensor) -> Tensor:
+    def forward(self, X: Tensor, d: int) -> Tensor:
         """fit followed by project. Takes input of shape (N, nfeatures)"""
         self.fit(X)
-        return self.project(X)
+        return self.project(X, d)
