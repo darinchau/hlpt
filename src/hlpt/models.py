@@ -140,9 +140,12 @@ class ExtractPrincipalComponent(Model):
     def __init__(self):
         self.eigenvectors = None
 
-    def fit(self, X: Tensor):
-        """X is a (N, n_features). This computes the projection data for PCA. Returns None. The sorted eigenvalues is at `model.eigenvalues` and the sorted eigenvectors are at `model.eigenvectors`"""
-        cov = torch.cov(X.T.float())
+    def fit(self, x: Tensor):
+        """X is a (..., n_features). This computes the projection data for PCA. Returns None. The sorted eigenvalues is at `model.eigenvalues` and the sorted eigenvectors are at `model.eigenvectors`"""
+        # Flatten all dimensions first
+        xs = x.shape
+        x = x.flatten(0, -2)
+        cov = torch.cov(x.T.float())
         l, v = torch.linalg.eig(cov)
 
         # Temporarily supress warnings. This normally screams at us for discarding the complex part. But covariance matric is always positive definite so real eigenvalues :)
@@ -151,19 +154,22 @@ class ExtractPrincipalComponent(Model):
             self.eigenvalues, sorted_eigenidx = torch.abs(l.double()).sort(descending=True)
             self.eigenvectors = v[:, sorted_eigenidx].double()
         
-    def project(self, X: Tensor, d: int) -> Tensor:
-        """X is a (N, n_features) tensor. This performs the projection for you and returns an (n_data, d) tensor. Raises a runtime error if n_features does not match that in training"""
+        x = x.unflatten(0, xs[:-1])
+        
+    def project(self, x: Tensor) -> Tensor:
+        """X is a (..., n_features) tensor. This performs the projection for you and returns an (n_data, d) tensor. Raises a runtime error if n_features does not match that in training"""
         if self.eigenvectors is None:
             raise RuntimeError("Projection data has not been calculated yet. Please first call model.fit()")
         
-        P = self.eigenvectors[:, :d]
+        P = self.eigenvectors
         
-        if X.shape[1] != P.shape[0]:
-            raise RuntimeError(f"Expects {P.shape[0]}-dimensional data due to training. Got {X.shape[1]}-d data instead.")
+        if x.shape[1] != P.shape[0]:
+            raise RuntimeError(f"Expects {P.shape[0]}-dimensional data due to training. Got {x.shape[1]}-d data instead.")
         
         # Welcome to transpose hell
-        X_ = X - torch.mean(X.float(), dim = 0)
+        X_ = x - torch.mean(x.float(), dim = 0)
         components = X_.double() @ P
+        components = components / torch.max(torch.abs(components))
         return components
     
     def unproject(self, X: Tensor):
@@ -185,7 +191,7 @@ class ExtractPrincipalComponent(Model):
             raise RuntimeError("PCA eigenvectors matrix is not invertible for some reason. This is probably due to that there are very very very small (coerced to 0) eigenvalues.")
         return result
         
-    def forward(self, X: Tensor, d: int) -> Tensor:
+    def forward(self, x: Tensor) -> Tensor:
         """fit followed by project. Takes input of shape (N, nfeatures)"""
-        self.fit(X)
-        return self.project(X, d)
+        self.fit(x)
+        return self.project(x)
