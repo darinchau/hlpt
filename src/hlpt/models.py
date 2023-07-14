@@ -195,3 +195,7 @@ class ExtractPrincipalComponent(Model):
         """fit followed by project. Takes input of shape (N, nfeatures)"""
         self.fit(x)
         return self.project(x)
+
+class Normalize(Model):
+    def forward(self, x: Tensor) -> Tensor:
+        return (x - x.min()) / (x.max() - x.min())
