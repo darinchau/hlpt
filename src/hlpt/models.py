@@ -197,5 +197,9 @@ class ExtractPrincipalComponent(Model):
         return self.project(x)
 
 class Normalize(Model):
+    def __init__(self, min_ = 0, max_ = 1):
+        self.min = min_
+        self.max = max_
+    
     def forward(self, x: Tensor) -> Tensor:
-        return (x - x.min()) / (x.max() - x.min())
+        return (x - x.min()) / (x.max() - x.min()) * (self.max - self.min) + self.min

@@ -4,6 +4,8 @@ from typing import Self
 from torch import nn
 from abc import ABC, abstractmethod as virtual
 from torch import Tensor
+import numpy as np
+import warnings
 
 def _class_name(x) -> str:
     """Returns the model name according to the class name."""
@@ -90,6 +92,10 @@ class Model(nn.Module):
     
     # The following exists purely to add type annotations
     def __call__(self, *x: Tensor) -> Tensor:
+        # for t in x:
+        #     if isinstance(t, np.ndarray):
+        #         warnings.warn(f"Found one numpy array passed to {_class_name(self)} just in case you forgot to turn something into a tensor")
+        #         break
         return super().__call__(*x)
 
     def to(self, *args, **kwargs) -> Self:
