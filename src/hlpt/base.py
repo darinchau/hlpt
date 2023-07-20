@@ -72,7 +72,10 @@ class Model(nn.Module):
     
     # Recursively get all the model info
     def _get_model_info(self, layers: int):
-        s = "- " * layers + f"{_class_name(self)} (Trainable: {self._num_trainable()}, Other: {self._num_nontrainable()})"
+        if layers == 0:
+            s = f"{_class_name(self)} (Trainable: {self._num_trainable()}, Other: {self._num_nontrainable()})"
+        else:
+            s = "  " * (layers - 1) + f"- {_class_name(self)} (Trainable: {self._num_trainable()}, Other: {self._num_nontrainable()})"
         if self._info_show_impl_details:
             for model in self.children():
                 s += "\n"
