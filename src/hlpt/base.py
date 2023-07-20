@@ -91,12 +91,8 @@ class Model(nn.Module):
         return _class_name(self)
     
     # The following exists purely to add type annotations
-    def __call__(self, *x: Tensor) -> Tensor:
-        # for t in x:
-        #     if isinstance(t, np.ndarray):
-        #         warnings.warn(f"Found one numpy array passed to {_class_name(self)} just in case you forgot to turn something into a tensor")
-        #         break
-        return super().__call__(*x)
+    def __call__(self, *x: Tensor, **kwargs) -> Tensor:
+        return super().__call__(*x, **kwargs)
 
     def to(self, *args, **kwargs) -> Self:
         return super().to(*args, **kwargs)

@@ -172,7 +172,7 @@ class ExtractPrincipalComponent(Model):
         components = components / torch.max(torch.abs(components))
         return components
     
-    def unproject(self, X: Tensor):
+    def unproject(self, x: Tensor):
         """Try to compute the inverse of model.project(X). The input is a tensor of shape (n_data, d) and returns a tensor of (n_data, n_features)"""
         # XP = X* so given X* we have X = X*P⁻¹
         # Problem is P is a matrix of shape (n_features, d), so we need to make it square first to take inverse.
@@ -182,8 +182,8 @@ class ExtractPrincipalComponent(Model):
         if self.eigenvectors is None:
             raise RuntimeError("Projection data has not been calculated yet. Please first call model.fit()")
 
-        X_ = torch.zeros(X.shape[0], self.eigenvalues.shape[0])
-        X_[:, :X.shape[1]] = X
+        X_ = torch.zeros(x.shape[0], self.eigenvalues.shape[0])
+        X_[:, :x.shape[1]] = x
         P = self.eigenvectors
         try:
             result = X_ @ torch.linalg.inv(P)
