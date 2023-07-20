@@ -15,12 +15,15 @@ __all__ = (
     "AddNoise", 
     "AddPitchScaling", 
     "AddRandomGain", 
-    "AddTimeStretch", 
+    "AddFFTTimeStretch", 
     "AddWhiteNoise",
     "AddReverb",
     "AddLowPassFilter",
-    "AddTimeMasking",
-    "AddFrequencyMasking"
+    "AddHighPassFilter",
+    "AddWhiteNoisePadding",
+    "AddFFTTimeMasking",
+    "AddFFTFrequencyMasking",
+    "AddHighPassFilter"
 )
 
 class ExtractFFT(Model):
@@ -37,7 +40,7 @@ class ExtractFFT(Model):
         x[x < -80] = -80
         return torch.transpose(x, 1, 2)
 
-class AddTimeStretch(AugmentationLayer):
+class AddFFTTimeStretch(AugmentationLayer):
     def __init__(self, min_ = 0.8, max_ = 1.2, p = 0.5, nbins = 128):
         """PyTorch augmentation layer that applies time stretching on mel spectrogram. Accepts audio of shape (N, nfrequency, nbins)"""
         super().__init__(p)
@@ -59,7 +62,7 @@ class AddTimeStretch(AugmentationLayer):
             x = self.t(x.transpose(-1, -2), rate).to(dtype = x.dtype).transpose(-1, -2)
         return x
 
-class AddFrequencyMasking(AugmentationLayer):
+class AddFFTFrequencyMasking(AugmentationLayer):
     def __init__(self, p = 0.4, max_width_percentage = 0.08, nbins = 128):
         """PyTorch augmentation layer that applies frequency masking on mel spectrogram. Accepts audio of shape (N, nfrequency, nbins)"""
         super().__init__(p)
@@ -79,7 +82,7 @@ class AddFrequencyMasking(AugmentationLayer):
         x[..., bottom:bottom+mask] = torch.min(x)
         return x
     
-class AddTimeMasking(AugmentationLayer):
+class AddFFTTimeMasking(AugmentationLayer):
     def __init__(self, p = 0.4, max_width_percentage = 0.08, nbins = 128):
         """PyTorch augmentation layer that applies time masking on mel spectrogram. Accepts audio of shape (N, nfrequency, nbins)"""
         super().__init__(p)
@@ -160,19 +163,6 @@ class AddRandomGain(AugmentationLayer):
         x = x * self.rand(self.min_gain_factor, self.max_gain_factor)
         return x
 
-class AddReverb(AugmentationLayer):
-    """Audio feature extraction. Accepts audio of shape (N, nchannels, nframes)"""
-    def __init__(self, sample_rate_hz: int, p = 0.4):
-        super().__init__(p)
-        self.sample_rate_hz = sample_rate_hz
-    
-    def forward(self, x: Tensor):
-        xs = x.shape[:-1]
-        x = x.flatten(end_dim=-2).detach().cpu()
-        x, _ = torchaudio.sox_effects.apply_effects_tensor(x, self.sample_rate_hz, [["reverb", "-w"]])
-        x = x.to(x.device, dtype = x.dtype).unflatten(dim = 0, sizes = xs)
-        return x
-
 class AddLowPassFilter(AugmentationLayer):
     """Audio feature extraction. Accepts audio of shape (N, nchannels, nframes)"""
     def __init__(self, sample_rate_hz: int, p = 0.4):
@@ -228,4 +218,7 @@ class AddWhiteNoisePadding(AugmentationLayer):
 
     def forward(self, x: Tensor):
         length = int(self.sample_rate_hz * self.max_second * self.rand())
-        return nn.functional.pad(x, (0, 0, length), value = 0)
+        x = nn.functional.pad(x, (0, 0, length), value = 0)
+        amplitude = self.rand(self.min_amplitude, self.max_amplitude)
+        noise = torch.rand_like(x)
+        x = x + amplitude * noise
