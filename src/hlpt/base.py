@@ -39,8 +39,9 @@ def _nontrain_cnt(model: nn.Module):
 def _model_info(m: nn.Module, layers: int) -> str:
     if isinstance(m, Model):
         return m._get_model_info(layers)
-    else:
-        return "- " * layers + f"{_class_name(m)} (Trainable: {_trainable_cnt(m)}, Other: {_nontrain_cnt(m)})"
+    
+    assert layers > 0, f"How did you get here?"
+    return "  " * (layers - 1) + f"- {_class_name(m)} (Trainable: {_trainable_cnt(m)}, Other: {_nontrain_cnt(m)})"
 
 class Model(nn.Module):
     """Abstract class for all models/model layers etc"""
