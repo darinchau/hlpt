@@ -29,5 +29,4 @@
 
 from hlpt.base import Model
 from hlpt.util import History, CudaMonitor
-from hlpt.data import DataIterator
 from hlpt.augments.base import AugmentationLayer, Preprocessor
