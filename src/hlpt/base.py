@@ -47,7 +47,6 @@ class Model(nn.Module):
     """Abstract class for all models/model layers etc"""
     # If true, then recursively show the model children details in summary
     _info_show_impl_details = True
-    _skip_initialization = False
 
     def __new__(cls, *args, **kwargs):
         self = super(Model, cls).__new__(cls)

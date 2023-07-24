@@ -211,14 +211,17 @@ class AddReverb(AugmentationLayer):
     
 class AddWhiteNoisePadding(AugmentationLayer):
     """Audio feature extraction. Accepts audio of shape (N, nchannels, nframes)"""
-    def __init__(self, sample_rate_hz: int, max_second: float = 0.1, p = 0.3):
+    def __init__(self, sample_rate_hz: int, max_second: float = 0.1, min_amplitude = 0.1, max_amplitude = 0.2, p = 0.3):
         super().__init__(p)
         self.sample_rate_hz = sample_rate_hz
         self.max_second = max_second
+        self.min_amplitude = min_amplitude
+        self.max_amplitude = max_amplitude
 
     def forward(self, x: Tensor):
         length = int(self.sample_rate_hz * self.max_second * self.rand())
-        x = nn.functional.pad(x, (0, 0, length), value = 0)
+        x = nn.functional.pad(x, (length//2, length//2), value = 0)
         amplitude = self.rand(self.min_amplitude, self.max_amplitude)
         noise = torch.rand_like(x)
         x = x + amplitude * noise
+        return x

@@ -58,7 +58,7 @@ class Sequential(nn.Sequential, Model):
         """Sequential model. This has to be overloaded for better error messages"""
         for model in f:
             assert isinstance(model, nn.Module)
-        super().__init__(*f) # This works because: at Model.__new__, Module init is called, here, Sequential.__init__ is called
+        super().__init__(*f)
 
     def forward(self, x):
         for model in self:

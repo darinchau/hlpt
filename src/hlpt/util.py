@@ -20,7 +20,6 @@ class History:
             self._test_called = False
             self.update()
         
-
     def test(self):
         self.training = False
         self._test_called = True
