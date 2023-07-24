@@ -5,6 +5,8 @@ from torch import nn, Tensor
 import torch
 import traceback
 import warnings
+from itertools import islice
+from collections import OrderedDict
 
 class StochasticNode(Model):
     """Stochastic node for VAE. The output is inherently random. Specify the device if needed"""
@@ -50,15 +52,16 @@ class StochasticNode(Model):
 
         return z
 
-class Sequential(Model):
+class Sequential(nn.Sequential, Model):
+    _info_show_impl_details = True
     def __init__(self, *f):
-        """Sequential model. This has to be overloaded for better error messages and better support for children"""
+        """Sequential model. This has to be overloaded for better error messages"""
         for model in f:
             assert isinstance(model, nn.Module)
-        self.fs = f
+        super().__init__(*f) # This works because: at Model.__new__, Module init is called, here, Sequential.__init__ is called
 
     def forward(self, x):
-        for model in self.fs:
+        for model in self:
             try:
                 x = model(x)
             except Exception as e:
@@ -67,72 +70,9 @@ class Sequential(Model):
                 print(f"Traceback: {traceback_str}")
                 raise e
         return x
-    
-    def children(self):
-        for i, model in enumerate(self.fs):
-            yield model
 
     def _get_model_info(self, layers: int):
-        return "\n".join([_model_info(model, layers) for model in self.fs])
-
-# Modified from https://pytorch.org/tutorials/beginner/transformer_tutorial.html
-class PositionalEncoding(Model):
-    _info_show_impl_details = False
-    def __init__(self, dim_model, dropout_p, max_len):
-        """Positional encoding useful for transformers"""
-        self.dropout = nn.Dropout(dropout_p)
-        pos_encoding = torch.zeros(max_len, dim_model)
-        positions_list = torch.arange(0, max_len, dtype=torch.float).view(-1, 1)
-        division_term = torch.exp(torch.arange(0, dim_model, 2).float() * (-9.21034037) / dim_model) # That hard coded thing -9.21 is -log(10000)
-        
-        pos_encoding[:, 0::2] = torch.sin(positions_list * division_term)
-        pos_encoding[:, 1::2] = torch.cos(positions_list * division_term)
-        
-        pos_encoding = pos_encoding.unsqueeze(0).transpose(0, 1)
-        self.register_buffer("pos_encoding", pos_encoding)
-        
-    def forward(self, token_embedding: Tensor) -> Tensor:
-        return self.dropout(token_embedding + self.pos_encoding[:token_embedding.size(0), :])
-
-class LSTMSequenceModel(Model):
-    def __init__(self, in_features: int, out_features: int, max_batch_size: int = 32):
-        """Takes in vectors of shape (N, in_features), and returns sequence of vectors (N, seq_len, out_features). This can be used as inverse to LSTM"""
-        self.rnn = nn.LSTMCell(in_features, out_features)
-        self.out_feats = out_features
-        # Make the states parameters so the Model.to() method moves it around
-        self.register_buffer("hx", torch.zeros(max_batch_size, self.out_feats))
-        self.register_buffer("cx", torch.zeros(max_batch_size, self.out_feats))
-        self.max_batch_size = max_batch_size
-
-    def forward(self, x: Tensor, sequence_length: int):
-        N = len(x)
-        if N > self.max_batch_size:
-            raise RuntimeError(f"The batch size along the first dimension {N} is greater than the max specified batch size {self.max_batch_size}")
-        # Reset state
-        self.hx[:] = 0
-        self.cx[:] = 0
-        
-        hx = self.hx[:N]
-        cx = self.cx[:N]
-        output = []
-        for _ in range(sequence_length):
-            hx, cx = self.rnn(x, (hx, cx))
-            output.append(hx)
-        output = torch.stack(output, dim = 1)
-        return output
-
-class Ligma(Model):
-    """This stands for Linear sigmoid activation, which is defined as:
-    
-    Ligma(x) = 0 if x < -1, (x+1)/2 if -1 < x < 1, 1 if x > 1
-    
-    Advantages: Both outputs and gradients are bounded to prevent vanishing gradient
-    when x < -1, l(x) = 0 so for sparse entry
-    
-    Disadvantages: input signal might easily get lost since everything is clamped"""
-    def forward(self, x: Tensor):
-        x = (torch.abs(x + 1) - torch.abs(x - 1) + 2) / 4
-        return x
+        return "\n".join([_model_info(model, layers) for model in self])
 
 class ExtractPrincipalComponent(Model):
     """Takes the tensor x, and returns the principal d dimensions by calculating its covariance matrix. d indicates the number of principal components to extract

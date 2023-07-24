@@ -47,6 +47,7 @@ class Model(nn.Module):
     """Abstract class for all models/model layers etc"""
     # If true, then recursively show the model children details in summary
     _info_show_impl_details = True
+    _skip_initialization = False
 
     def __new__(cls, *args, **kwargs):
         self = super(Model, cls).__new__(cls)
@@ -55,7 +56,7 @@ class Model(nn.Module):
             raise NotImplementedError(f"The model {_class_name(self)} did not implement the forward method")
         return self
     
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
         """Creates a new model that can be combined with other models to form bigger models. :)"""
         pass
     
