@@ -77,6 +77,17 @@ class Sequential(nn.Sequential, Model):
 class ModelList(nn.ModuleList, Model):
     def _get_model_info(self, layers: int):
         return "\n".join([_model_info(model, layers) for model in self])
+    
+    def forward(self, x: Tensor):
+        for model in self:
+            try:
+                x = model(x)
+            except Exception as e:
+                traceback_str = ''.join(traceback.format_tb(e.__traceback__))
+                print(f"Encountered error while running {model}")
+                print(f"Traceback: {traceback_str}")
+                raise e
+        return x
 
 class ExtractPrincipalComponent(Model):
     """Takes the tensor x, and returns the principal d dimensions by calculating its covariance matrix. d indicates the number of principal components to extract
