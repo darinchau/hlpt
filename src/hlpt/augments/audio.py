@@ -19,7 +19,6 @@ __all__ = (
     "AddLowPassFilter",
     # "AddHighPassFilter", # Found bug, fix in future
     "AddWhiteNoisePadding",
-    "AddHighPassFilter",
     "AudioAugmentationLayer"
 )
 
