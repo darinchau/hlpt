@@ -9,6 +9,7 @@ import warnings
 from torchvision.transforms._functional_tensor import _get_gaussian_kernel2d
 
 __all__ = (
+    "VideoAugmentationLayer",
     "AddCenterCrop", 
     "AddGaussianBlur", 
     "AddRandomChanneling", 
@@ -17,7 +18,18 @@ __all__ = (
     "AddSaltAndPepper",
 )
 
-class AddSaltAndPepper(AugmentationLayer):
+class VideoAugmentationLayer(AugmentationLayer):
+    def __call__(self, x: Tensor):
+        """PyTorch augmentation layer on videos. Accepts video tensor of shape (..., time, channel, H, W)"""
+        if len(x.shape) < 5:
+            raise RuntimeError(f"{self.__repr__()} accepts audio of shape (..., time, channel, H, W), found x with shape {x.shape}")
+        s = x.shape[:-4]
+        x = x.flatten(0, -5)
+        y = super().__call__(x)
+        y = y.unflatten(0, s)
+        return y
+
+class AddSaltAndPepper(VideoAugmentationLayer):
     """Adds salt and pepper to image/video with some percentage"""
     def __init__(self, p = 0.5, salt_percentage=0.008, pepper_percentage=0.008):
         super().__init__(p)
@@ -35,7 +47,7 @@ class AddSaltAndPepper(AugmentationLayer):
         x[pepper_mask] = 0
         return x
 
-class AddGaussianBlur(AugmentationLayer):
+class AddGaussianBlur(VideoAugmentationLayer):
     """Adds Gaussian Blur to the video which should have input dimension (N, frame, C, H, W) ranging from 0 to 1"""
     def __init__(self, p = 0.2, kernel_size = 3, sigma = [0.1, 2.0]):
         super().__init__(p) 
@@ -56,8 +68,8 @@ class AddGaussianBlur(AugmentationLayer):
         x = x.unflatten(0, (lx, -1))
         return x
     
-class AddCenterCrop(AugmentationLayer):
-    """Center crops the video and resize it back to full size. Video should have input dimension (N, frame, C, H, W). At most we will crop max_crop_pixels pixels from the border"""
+class AddCenterCrop(VideoAugmentationLayer):
+    """Center crops the video and resize it back to full size"""
     def __init__(self, input_size: int | tuple[int, int], p = 0.2, max_crop_pixels = 20):
         super().__init__(p) 
         self.maxcrop = max_crop_pixels
@@ -69,8 +81,8 @@ class AddCenterCrop(AugmentationLayer):
         x = self.resize(x)
         return x
     
-class AddRandomChanneling(AugmentationLayer):
-    """Randomly selects one channel or take the grayscale image :). Video should be (N, frame, C, H, W)"""
+class AddRandomChanneling(VideoAugmentationLayer):
+    """Randomly selects one channel or take the grayscale image :)"""
     def __init__(self, p = 0.4):
         super().__init__(p)
     
@@ -93,8 +105,8 @@ class AddRandomChanneling(AugmentationLayer):
             x[:] = c * x[..., 0:1, :, :] + d * x[..., 1:2, :, :]  + e * x[..., 2:3, :, :]
         return x
     
-class AddRandomCrop(AugmentationLayer):
-    """Randomly crop the video and resize it back to full size. Video should have input dimension (N, frame, C, H, W). At most we will crop max_crop_pixels pixels from the border"""
+class AddRandomCrop(VideoAugmentationLayer):
+    """Randomly crop the video and resize it back to full size."""
     def __init__(self, input_size: int | tuple[int, int], min_croped_size = 0.6, p = 0.4):
         super().__init__(p)
         assert min_croped_size <= 1
@@ -119,7 +131,7 @@ class AddRandomCrop(AugmentationLayer):
         x = x.unflatten(0, (lx, -1))
         return x
 
-class AddRandomColoring(AugmentationLayer):
+class AddRandomColoring(VideoAugmentationLayer):
     def __init__(self, p = 0.3, brightness = 0.2, contrast = 0.2, hue = 0.2, saturation = 0.2):
         super().__init__(p)
         self.jitter = vision.ColorJitter(brightness, contrast, saturation, hue)
