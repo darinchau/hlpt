@@ -60,6 +60,7 @@ class History:
         ax.legend()
         ax.set_title(f"Train/Test Error plot")
         fig.savefig(f"{root}/{n} training loss.jpg")
+        plt.close('all')
 
     def __iter__(self):
         for i, losses in enumerate(self.losses):
@@ -75,10 +76,6 @@ class History:
         """Print the current epoch loss information"""
         s = f"Epoch {len(self.losses) - 1}: ".ljust(13)
         for name, loss in self.losses[-1].items():
-            # if self.training and name.startswith("Test"):
-            #     continue
-            # elif not self.training and name.startswith("Train"):
-            #     continue
             s += f"{name} = {loss:.4f} "
         return s
 
