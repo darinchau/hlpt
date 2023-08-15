@@ -72,9 +72,9 @@ class History:
         for s in self.logs:
             yield s
 
-    def current_epoch(self) -> str:
-        """Print the current epoch loss information"""
-        s = f"Epoch {len(self.losses) - 1}: ".ljust(13)
+    def current_epoch(self, current_epoch: int = -1) -> str:
+        """Print the current epoch loss information. If current epoch < 0, then we help you calculate the epoch. Otherwise override the epoch for you, which would be the zero-count epoch number."""
+        s = f"Epoch {current_epoch if current_epoch > 0 else len(self.losses) - 1}: ".ljust(13)
         for name, loss in self.losses[-1].items():
             s += f"{name} = {loss:.4f} "
         return s
