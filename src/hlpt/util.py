@@ -10,7 +10,6 @@ class History:
         self.losses: list[dict[str, float]] = [{}]
         self.counts = {}
         self.names: set[str] = set()
-        self.logs: list[str] = []
         self.training = True
         self._test_called = False
     
@@ -52,7 +51,7 @@ class History:
             x, y = [], []
             for i, losses in enumerate(self.losses):
                 if name in losses:
-                    x.append(i)
+                    x.append(i+1)
                     y.append(losses[name])
             ax.plot(x, y, label = name)
 
@@ -64,12 +63,8 @@ class History:
 
     def __iter__(self):
         for i, losses in enumerate(self.losses):
-            s = f"On epoch {i}: "
+            s = f"On epoch {i + 1}: "
             s += ", ".join([f"{k} = {v:.6f}"for k, v in losses.items()])
-            yield s
-        
-        yield "\n"
-        for s in self.logs:
             yield s
 
     def current_epoch(self, current_epoch: int = -1) -> str:
