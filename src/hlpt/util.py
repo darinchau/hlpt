@@ -51,7 +51,7 @@ class History:
             x, y = [], []
             for i, losses in enumerate(self.losses):
                 if name in losses:
-                    x.append(i+1)
+                    x.append(i+2)
                     y.append(losses[name])
             ax.plot(x, y, label = name)
 
