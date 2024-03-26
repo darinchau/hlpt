@@ -1,10 +1,10 @@
 [project]
-name = "High-level PyTorch"
+name = "mlutils"
 version = "0.1.0"
 authors = [
   { name="Darin Chau", email="darinchauyf@gmail.com" },
 ]
-description = "Pytorch with utilities"
+description = "My machine learning utils for Google Colab"
 readme = "README.md"
 requires-python = ">=3.10"
 classifiers = [
